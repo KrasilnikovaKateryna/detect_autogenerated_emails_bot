@@ -107,53 +107,55 @@ def get_html_emails(user_email, user_password):
 
     # Чтение последних 20 писем
     for email_id in email_ids:
-        # Получение данных письма
-        status, msg_data = mail.fetch(email_id, "(RFC822)")
+        try:
+            # Получение данных письма
+            status, msg_data = mail.fetch(email_id, "(RFC822)")
 
-        for response_part in msg_data:
-            if isinstance(response_part, tuple):
-                # Парсинг сообщения
-                msg = email.message_from_bytes(response_part[1])
+            for response_part in msg_data:
+                if isinstance(response_part, tuple):
+                    # Парсинг сообщения
+                    msg = email.message_from_bytes(response_part[1])
 
-                # Декодирование заголовков
-                subject, encoding = decode_header(msg["Subject"])[0]
-                if isinstance(subject, bytes):
-                    subject = subject.decode(encoding if encoding else "utf-8")
-                sender = msg.get("From")
+                    # Декодирование заголовков
+                    subject, encoding = decode_header(msg["Subject"])[0]
+                    if isinstance(subject, bytes):
+                        subject = subject.decode(encoding if encoding else "utf-8")
+                    sender = msg.get("From")
 
-                # Парсинг времени отправки письма
-                date_str = msg["Date"]
-                sent_at = parse_email_date(date_str)
+                    # Парсинг времени отправки письма
+                    date_str = msg["Date"]
+                    sent_at = parse_email_date(date_str)
 
-                # Если письмо содержит HTML
-                body = ""
-                if msg.is_multipart():
-                    for part in msg.walk():
-                        content_type = part.get_content_type()
-                        content_disposition = str(part.get("Content-Disposition"))
+                    # Если письмо содержит HTML
+                    body = ""
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            content_type = part.get_content_type()
+                            content_disposition = str(part.get("Content-Disposition"))
 
-                        # Получение HTML или текстовой версии письма
-                        if content_type == "text/plain" and "attachment" not in content_disposition:
-                            try:
-                                body = part.get_payload(decode=True).decode()
-                            except:
-                                traceback.print_exc()
-                            break
-                        elif content_type == "text/html":
-                            try:
-                                body = part.get_payload(decode=True).decode()
-                            except:
-                                traceback.print_exc()
-                            break
-                else:
-                    # Если письмо не мультичастное
-                    content_type = msg.get_content_type()
-                    if content_type == "text/plain" or content_type == "text/html":
-                        body = msg.get_payload(decode=True).decode()
+                            # Получение HTML или текстовой версии письма
+                            if content_type == "text/plain" and "attachment" not in content_disposition:
+                                try:
+                                    body = part.get_payload(decode=True).decode()
+                                except:
+                                    traceback.print_exc()
+                                break
+                            elif content_type == "text/html":
+                                try:
+                                    body = part.get_payload(decode=True).decode()
+                                except:
+                                    traceback.print_exc()
+                                break
+                    else:
+                        # Если письмо не мультичастное
+                        content_type = msg.get_content_type()
+                        if content_type == "text/plain" or content_type == "text/html":
+                            body = msg.get_payload(decode=True).decode()
 
-                # Анализ письма
-                analyze_email_content(subject, sender, body, sent_at)
-
+                    # Анализ письма
+                    analyze_email_content(subject, sender, body, sent_at)
+        except:
+            traceback.print_exc()
     # Закрытие соединения
     mail.logout()
 
