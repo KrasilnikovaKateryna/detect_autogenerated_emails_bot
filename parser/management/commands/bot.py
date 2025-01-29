@@ -1,3 +1,5 @@
+import traceback
+
 import telebot
 from django.core.management import BaseCommand
 
@@ -41,7 +43,8 @@ def start_parsing(message):
         export_news_to_google_forms()
         bot.reply_to(message, "✅ Данные записаны в таблицу.")
     except Exception as e:
-        bot.reply_to(message, f"⚠ Ошибка: {str(e)}")
+        # bot.reply_to(message, f"⚠ Ошибка: {str(e)}")
+        traceback.print_exc()
 
     # Удаляем данные из памяти
     del user_data[chat_id]

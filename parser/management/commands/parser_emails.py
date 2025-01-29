@@ -1,6 +1,7 @@
 import imaplib
 import email
 import re
+import traceback
 from datetime import datetime
 from email.header import decode_header
 import requests
@@ -105,7 +106,7 @@ def get_html_emails(user_email, user_password):
     print(f"Найдено писем: {len(email_ids)}")
 
     # Чтение последних 20 писем
-    for email_id in email_ids[-20:]:
+    for email_id in email_ids:
         # Получение данных письма
         status, msg_data = mail.fetch(email_id, "(RFC822)")
 
@@ -133,10 +134,16 @@ def get_html_emails(user_email, user_password):
 
                         # Получение HTML или текстовой версии письма
                         if content_type == "text/plain" and "attachment" not in content_disposition:
-                            body = part.get_payload(decode=True).decode()
+                            try:
+                                body = part.get_payload(decode=True).decode()
+                            except:
+                                traceback.print_exc()
                             break
                         elif content_type == "text/html":
-                            body = part.get_payload(decode=True).decode()
+                            try:
+                                body = part.get_payload(decode=True).decode()
+                            except:
+                                traceback.print_exc()
                             break
                 else:
                     # Если письмо не мультичастное
