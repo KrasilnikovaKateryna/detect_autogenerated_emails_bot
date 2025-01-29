@@ -9,9 +9,6 @@ from parser.models import AutoNews, UserNews
 
 # Учетные данные
 IMAP_SERVER = "imap.gmail.com"
-EMAIL = "juliarichardsonn2@gmail.com"
-PASSWORD = "pkwhmvrufcztvzsx"  # Пароль приложения или обычный пароль
-
 nlp = spacy.load("en_core_web_sm")
 
 
