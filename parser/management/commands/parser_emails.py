@@ -229,4 +229,13 @@ def export_mails_to_google_forms():
 
     print("✅ Все данные отправлены в Google Forms!")
 
+    clear_database()
+
+
+def clear_database():
+    """Удаляет все записи из моделей AutoNews и UserNews"""
+    AutoNews.objects.all().delete()
+    UserNews.objects.all().delete()
+    print("✅ База данных очищена перед новым парсингом.")
+
 

@@ -40,7 +40,7 @@ def start_parsing(message):
         get_emails(email, password)  # Запуск скрипта парсинга почты
         bot.reply_to(message, "✅ Парсинг завершен! Данные сохранены в базе.")
         bot.reply_to(message, "✅ Сохранение в таблицу...")
-        # export_mails_to_google_forms()
+        export_mails_to_google_forms()
         bot.reply_to(message, "✅ Данные записаны в таблицу.")
     except Exception as e:
         # bot.reply_to(message, f"⚠ Ошибка: {str(e)}")
