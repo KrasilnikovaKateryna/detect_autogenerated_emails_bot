@@ -6,6 +6,8 @@ from datetime import datetime
 from email.header import decode_header
 import requests
 import spacy
+from openai import OpenAI
+
 from parser.models import AutoNews, UserNews
 import openai
 
@@ -168,16 +170,17 @@ OPENAI_API_KEY = "sk-proj-pAuNPIveZI8os9NxZh7P0ba66TV-pN9vihgoXhIa8eUijqhpTFNULn
 
 def extract_name_from_email(email_body):
     try:
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)  # Создаём клиент OpenAI
+        client = OpenAI()
 
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=[
                 {"role": "system",
                  "content": "You are an assistant who extracts the sender's name from the text of the letter.."},
                 {"role": "user",
                  "content": f"There is a text from the mail:\n{email_body}\n\nWhat is the sender's name? Write only sender's name without other words. If there is no name, write 'Unknown'."}
             ],
+            temperature=0
         )
 
         name = response.choices[0].message.content.strip()
