@@ -158,7 +158,7 @@ def get_emails(user_email, user_password):
 
     print(f"✅ Найдено писем: {len(email_ids)}")
 
-    for email_id in email_ids[-20:]:
+    for email_id in email_ids:
         process_email(mail, email_id)
 
     mail.logout()
