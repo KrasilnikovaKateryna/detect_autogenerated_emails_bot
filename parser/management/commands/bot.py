@@ -3,7 +3,7 @@ import traceback
 import telebot
 from django.core.management import BaseCommand
 
-from parser.management.commands.parser_emails import get_html_emails,export_news_to_google_forms
+from parser.management.commands.parser_emails import get_emails,export_mails_to_google_forms
 
 TOKEN = "8107264435:AAF_rwAoW5cLKJwYy-1Wsj3gQT5tL4BZYEY"
 bot = telebot.TeleBot(TOKEN)
@@ -37,10 +37,10 @@ def start_parsing(message):
     bot.send_message(chat_id, "⏳ Начинаю парсинг...")
 
     try:
-        get_html_emails(email, password)  # Запуск скрипта парсинга почты
+        get_emails(email, password)  # Запуск скрипта парсинга почты
         bot.reply_to(message, "✅ Парсинг завершен! Данные сохранены в базе.")
         bot.reply_to(message, "✅ Сохранение в таблицу...")
-        export_news_to_google_forms()
+        # export_mails_to_google_forms()
         bot.reply_to(message, "✅ Данные записаны в таблицу.")
     except Exception as e:
         # bot.reply_to(message, f"⚠ Ошибка: {str(e)}")
