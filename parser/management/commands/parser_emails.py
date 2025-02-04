@@ -8,6 +8,7 @@ import requests
 import spacy
 from openai import OpenAI
 
+from parser.bot_instance import bot
 from parser.models import AutoNews, UserNews
 import openai
 
@@ -49,8 +50,15 @@ def analyze_email_content(subject, sender, body, sent_at):
 
     if is_automated:
         save_auto_news(sender_name, sender_email, body, sent_at)
+        send_to_google_forms(sent_at, sender_name, sender_email, body, auto_gen=True)
     else:
+        extracted_name = extract_name_from_email(body)
+        if extracted_name is not None:
+            sender_name = extracted_name
+        print(f"🎯 Извлеченное имя: {extracted_name}")
+
         save_user_news(sender_name, sender_email, body, sent_at)
+        send_to_google_forms(sent_at, sender_name, sender_email, body, auto_gen=False)
 
     print("=" * 50)
 
@@ -141,36 +149,55 @@ def process_email(mail, email_id):
                     continue
 
                 sent_at = parse_email_date(date_str)
-                extracted_name = extract_name_from_email(body)
 
-                print(f"🎯 Извлеченное имя: {extracted_name}")
 
                 analyze_email_content(subject, sender, body, sent_at)
 
     except Exception:
         traceback.print_exc()
 
-def get_emails(user_email, user_password):
+def get_emails(user_email, user_password, chat_id=None):
+    """Парсит почту и отправляет процент выполнения в Telegram"""
+    clear_database()  # Очищаем базу перед парсингом
+
     mail = imaplib.IMAP4_SSL("imap.gmail.com")
     mail.login(user_email, user_password)
     mail.select("inbox")
 
     status, messages = mail.search(None, "ALL")
     email_ids = messages[0].split()
+    total_emails = len(email_ids)  # Всего писем
+    processed_emails = 0  # Счётчик обработанных писем
 
-    print(f"✅ Найдено писем: {len(email_ids)}")
+    print(f"✅ Найдено писем: {total_emails}")
 
-    for email_id in email_ids:
-        process_email(mail, email_id)
+    if chat_id:
+        bot.send_message(chat_id, f"📩 Найдено писем: {total_emails}\nНачинаю обработку...")
+
+    for index, email_id in enumerate(email_ids, start=1):
+        process_email(mail, email_id)  # Обрабатываем письмо
+        processed_emails += 1
+
+        # Вычисляем процент выполнения
+        percent_complete = int((processed_emails / total_emails) * 100)
+
+        # Отправляем обновление каждые 10%
+        if (percent_complete % 10 == 0 or processed_emails == total_emails) and percent_complete > 0:
+            message = f"📊 Выполнено: {percent_complete}% ({processed_emails}/{total_emails})"
+            print(message)
+            if chat_id:
+                bot.send_message(chat_id, message)
 
     mail.logout()
 
-OPENAI_API_KEY = "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"
+    if chat_id:
+        bot.send_message(chat_id, "✅ Парсинг завершен! Данные сохранены в базе.")
+
 
 
 def extract_name_from_email(email_body):
     try:
-        client = OpenAI()
+        client = OpenAI()  # Создаём клиент OpenAI
 
         response = client.chat.completions.create(
             model="gpt-4o",
@@ -232,7 +259,7 @@ def export_mails_to_google_forms():
 
     print("✅ Все данные отправлены в Google Forms!")
 
-    clear_database()
+
 
 
 def clear_database():
