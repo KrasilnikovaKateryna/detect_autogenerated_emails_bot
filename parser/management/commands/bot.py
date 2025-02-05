@@ -4,7 +4,7 @@ import traceback
 from django.core.management import BaseCommand
 
 from parser.bot_instance import bot
-from parser.management.commands.parser_emails import get_emails,export_mails_to_google_forms
+from parser.management.commands.parser_emails import get_emails
 
 is_running = False  # Флаг состояния бота
 user_data = {}  # Хранилище данных пользователей
