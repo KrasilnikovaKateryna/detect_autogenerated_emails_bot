@@ -25,7 +25,7 @@ def analyze_email_content(subject, sender, body, sent_at):
 
     sender_name, sender_email = extract_sender_info(sender)
 
-    if sender_email and "no-reply" in sender_email.lower():
+    if sender_email and ("no-reply" or "noreply") in sender_email.lower():
         is_automated = True
 
     if "unsubscribe" in body.lower():
@@ -33,7 +33,7 @@ def analyze_email_content(subject, sender, body, sent_at):
 
     automated_phrases = [
         "do not reply", "automated message", "click here",
-        "manage your preferences", "update your settings"
+        "manage your preferences", "update your settings", "do not respond", "google"
     ]
     for phrase in automated_phrases:
         if phrase in body.lower():
@@ -120,77 +120,117 @@ def parse_email(msg):
 
 
 def process_email(mail, email_id):
-    is_automated = False
+    """Обрабатывает одно письмо, используя переданное IMAP-соединение"""
     try:
-        msg_data = fetch_email_data(mail, email_id)
-
+        status, msg_data = mail.fetch(email_id, "(RFC822)")
         for response_part in msg_data:
             if isinstance(response_part, tuple):
                 msg = email.message_from_bytes(response_part[1])
                 subject, sender, date_str, body = parse_email(msg)
 
                 if not subject or not sender or not body:
-                    continue
+                    return False
 
                 sent_at = parse_email_date(date_str)
-
-
                 is_automated = analyze_email_content(subject, sender, body, sent_at)
 
-    except:
-        traceback.print_exc()
+                return is_automated
 
-    return is_automated
+    except Exception as e:
+        print(f"⚠ Ошибка при обработке письма {email_id}: {str(e)}")
 
-
+    return False  # Если письмо не удалось обработать, считаем его пользовательским
 
 
 def get_emails(user_email, user_password, chat_id=None):
-    mail = imaplib.IMAP4_SSL("imap.gmail.com")
-    mail.login(user_email, user_password)
-    mail.select("inbox")
+    """Парсит почту, открывая IMAP-соединение каждые 100 писем"""
 
-    status, messages = mail.search(None, "ALL")
-    email_ids = messages[0].split()
+    try:
+        # 1️⃣ Подключаемся к Gmail
+        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        mail.login(user_email, user_password)
+        mail.select("inbox")
 
-    print(f"✅ Найдено писем: {len(email_ids)}")
-    if chat_id:
-        bot.send_message(chat_id, f"📩 Найдено писем: {len(email_ids)}\nФильтрую письма...")
+        # 2️⃣ Получаем список всех писем
+        status, messages = mail.search(None, "ALL")
+        email_ids = messages[0].split()
 
-    last_emails = filter_duplicates(email_ids, mail)
-    total_emails = len(last_emails)
+        print(f"✅ Найдено писем: {len(email_ids)}")
+        if chat_id:
+            bot.send_message(chat_id, f"📩 Найдено писем: {len(email_ids)}\nФильтрую письма...")
 
-    print(f"✅ После фильтрации осталось {total_emails} писем")
-    if chat_id:
-        bot.send_message(chat_id, f"📩 После фильтрации осталось {total_emails} писем")
+        # 3️⃣ Фильтруем дубликаты, оставляя только последнее письмо от каждого отправителя
+        last_emails = filter_duplicates(email_ids, mail)
+        total_emails = len(last_emails)
 
+        print(f"✅ После фильтрации осталось {total_emails} писем")
+        if chat_id:
+            bot.send_message(chat_id, f"📩 После фильтрации осталось {total_emails} писем")
+
+    except Exception as e:
+        print(f"⚠ Ошибка при подключении к Gmail: {str(e)}")
+        if chat_id:
+            bot.send_message(chat_id, f"⚠ Ошибка подключения к Gmail: {str(e)}")
+        return
+
+    finally:
+        # ✅ Закрываем IMAP-соединение после фильтрации
+        try:
+            mail.close()
+            mail.logout()
+        except:
+            pass
+
+    # 4️⃣ Обрабатываем письма (открывая IMAP каждые 100 писем)
     processed_emails = 0
     last_reported_percent = 0
-
     auto_mails = 0
     user_mails = 0
 
-    for index, email_id in enumerate(last_emails.values(), start=1):
-        is_automated = process_email(mail, email_id)
-        processed_emails += 1
+    email_list = list(last_emails.values())  # Преобразуем dict_values в список
 
-        if is_automated is True:
-            auto_mails += 1
-        elif is_automated is False:
-            user_mails += 1
+    for start_index in range(0, total_emails, 100):  # Обрабатываем письма пакетами по 100
+        try:
+            # ✅ Открываем IMAP-соединение перед обработкой 100 писем
+            mail = imaplib.IMAP4_SSL("imap.gmail.com")
+            mail.login(user_email, user_password)
+            mail.select("inbox")
 
-        percent_complete = int((processed_emails / total_emails) * 100)
+            for index in range(start_index, min(start_index + 100, total_emails)):
+                email_id = email_list[index]
+                is_automated = process_email(mail, email_id)  # Передаем IMAP-соединение
 
-        if percent_complete >= last_reported_percent + 10:
-            message = f"📊 Выполнено: {percent_complete}% ({processed_emails}/{total_emails})"
-            print(message)
+                processed_emails += 1
+                if is_automated:
+                    auto_mails += 1
+                else:
+                    user_mails += 1
+
+                percent_complete = int((processed_emails / total_emails) * 100)
+
+                # ✅ Обновление статуса раз в 10% или через каждые 50 писем
+                if percent_complete >= last_reported_percent + 10 or processed_emails % 50 == 0:
+                    message = f"📊 Выполнено: {percent_complete}% ({processed_emails}/{total_emails})"
+                    print(message)
+                    if chat_id:
+                        bot.send_message(chat_id, message)
+
+                    last_reported_percent = percent_complete
+
+        except Exception as e:
+            print(f"⚠ Ошибка при обработке писем: {str(e)}")
             if chat_id:
-                bot.send_message(chat_id, message)
+                bot.send_message(chat_id, f"⚠ Ошибка при обработке писем: {str(e)}")
 
-            last_reported_percent = percent_complete
+        finally:
+            # ✅ Закрываем IMAP-соединение после обработки 100 писем
+            try:
+                mail.close()
+                mail.logout()
+            except:
+                pass
 
-    mail.logout()
-
+    # ✅ Финальное сообщение с результатами
     final_message = (
         f"✅ Парсинг завершен!\n"
         f"📨 Всего обработано писем: {total_emails}\n"
@@ -199,7 +239,6 @@ def get_emails(user_email, user_password, chat_id=None):
     )
 
     print(final_message)
-
     if chat_id:
         bot.send_message(chat_id, final_message)
 
