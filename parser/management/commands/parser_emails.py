@@ -47,8 +47,19 @@ def analyze_email_content(subject, sender, body, sent_at):
     else:
         sender_name = extract_name_from_email(body, sender_name, sender_email)
         print(f"🎯 Извлеченное имя: {sender_name}")
-
-        send_to_google_forms(sent_at, sender_name, sender_email, body, auto_gen=False)
+        phone = extract_phone_from_email(body, sender_name, sender_email)
+        domain = extract_website_from_email(body, sender_name, sender_email)
+        company_name = extract_company_name_from_email(body, sender_name, sender_email)
+        send_to_google_forms(
+            sent_at,
+            sender_name,
+            sender_email,
+            body,
+            tel=phone,
+            domain=domain,
+            company_name=company_name,
+            auto_gen=False
+        )
 
     print("=" * 50)
     return is_automated
@@ -260,6 +271,55 @@ def filter_duplicates(email_ids, mail):
     return last_emails
 
 
+
+def extract_company_name_from_email(email_body, sender_name, sender_email):
+    try:
+        client = OpenAI()
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system",
+                 "content": "You are an advanced AI assistant that extracts the sender's company name from an email. "
+                            "Your response must contain ONLY the company name and nothing else. "
+                            "Follow these strict rules when extracting the company name:"},
+
+                {"role": "user",
+                 "content": f"""There is an email with the following content:
+
+                ------------------------------
+                **Sender Name (from Google Account):** {sender_name}  
+                **Sender Email Address:** {sender_email}  
+                **Email Body:**  
+                {email_body}
+                ------------------------------
+
+                **Extraction Rules:**
+                1️⃣ Try to find the company name in the **email body**, especially in the signature or footer.  
+                2️⃣ If the sender's name (from the Google Account) looks like a **company name**, use it.  
+                3️⃣ Do NOT confuse the recipient's company or referenced clients/partners with the sender’s company.  
+                4️⃣ If multiple companies are mentioned, choose the one clearly associated with the sender.  
+                5️⃣ If no valid company name is found, return exactly: `"No company"`
+
+                **Important Output Rules:**
+                - Respond with ONLY the company name (e.g., `Acme Corp`)  
+                - Do NOT add punctuation, quotes, or any explanation  
+                - If no valid company is found, return exactly: `"No company"`
+
+                What is the sender's company name according to these rules?"""
+                 }
+            ],
+            temperature=0
+        )
+
+        company = response.choices[0].message.content.strip()
+        return company if company else "No company"
+
+    except Exception as e:
+        print(f"⚠ Error while getting ChatGPT: {str(e)}")
+        return "No company"
+
+
 def extract_name_from_email(email_body, sender_name, sender_email):
     try:
         client = OpenAI()
@@ -309,26 +369,150 @@ def extract_name_from_email(email_body, sender_name, sender_email):
         return "Their"
 
 
-FORM_URL_USER = "https://docs.google.com/forms/d/e/1FAIpQLSfLwHTYqURZuf0PeyF65A6Je9zzlKZF2nhihCe_OLs2Ujls8g/formResponse"
-FORM_URL_AUTO = "https://docs.google.com/forms/d/e/1FAIpQLSdw1tpeSzQ1cXf9GzUV6WXhluHLH67b6IW35739ZKgvTTyqOw/formResponse"
+def extract_website_from_email(email_body, sender_name, sender_email):
+    try:
+        client = OpenAI()
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system",
+                 "content": "You are an advanced AI assistant that extracts the sender's company website from an email. "
+                            "Your response must contain ONLY the website URL and nothing else. "
+                            "Follow these strict rules when extracting the website:"},
+
+                {"role": "user",
+                 "content": f"""There is an email with the following content:
+
+                ------------------------------
+                **Sender Name (from Google Account):** {sender_name}  
+                **Sender Email Address:** {sender_email}  
+                **Email Body:**  
+                {email_body}
+                ------------------------------
+
+                **Extraction Rules:**
+                1️⃣ Look for a **valid website URL** in the email body (e.g., https://example.com or www.example.com).
+                2️⃣ If multiple websites are mentioned, return the **first one** that looks like the sender's/company's site.
+                3️⃣ Accept links with or without `https://`, but prefer **full domains** over shortened or social media links.
+                4️⃣ Ignore links to Gmail, LinkedIn, Facebook, Instagram, Twitter, and other social platforms unless clearly the main company site.
+                5️⃣ If no valid website is found, return exactly: `"No website"`
+
+                **Important Output Rules:**
+                - Respond with ONLY the website URL (e.g., `https://example.com`)
+                - Do NOT add quotes, labels, or explanation  
+                - If no valid website is found, return exactly: `"No website"`
+
+                What is the sender's company website according to these rules?"""
+                 }
+            ],
+            temperature=0
+        )
+
+        website = response.choices[0].message.content.strip()
+        return website if website else "No website"
+
+    except Exception as e:
+        print(f"⚠ Error while getting ChatGPT: {str(e)}")
+        return "No website"
+
+
+def extract_phone_from_email(email_body, sender_name, sender_email):
+    try:
+        client = OpenAI()
+
+        response = client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system",
+                 "content": "You are an advanced AI assistant that extracts the sender's phone number from an email. "
+                            "Your response must contain ONLY the phone number and nothing else. "
+                            "Follow these strict rules when extracting the phone number:"},
+
+                {"role": "user",
+                 "content": f"""There is an email with the following content:
+
+                ------------------------------
+                **Sender Name (from Google Account):** {sender_name}  
+                **Sender Email Address:** {sender_email}  
+                **Email Body:**  
+                {email_body}
+                ------------------------------
+
+                **Extraction Rules:**
+                1️⃣ Look for a phone number in the **email body**. It may appear in the signature or body content.
+                2️⃣ Prefer numbers that look like they are **mobile or personal contact numbers**, not generic support hotlines.
+                3️⃣ Accept international formats (e.g., +1 234-567-8901), local formats (e.g., (234) 567-8901), or plain (e.g., 2345678901).
+                4️⃣ If there are **multiple numbers**, return only the **first valid one** found.
+                5️⃣ If no phone number is found, return exactly: `"No phone"`
+
+                **Important Output Rules:**
+                - Respond with ONLY the phone number (e.g., `+1 234-567-8901`)  
+                - Do NOT add punctuation, quotes, labels, or any explanation.  
+                - If no valid number is found, return exactly: `"No phone"`
+
+                What is the sender's phone number according to these rules?"""
+                 }
+            ],
+            temperature=0
+        )
+
+        phone = response.choices[0].message.content.strip()
+        return phone if phone else "No phone"
+
+    except Exception as e:
+        print(f"⚠ Error while getting ChatGPT: {str(e)}")
+        return "No phone"
+
+
+FORM_URL_USER = "https://docs.google.com/forms/u/0/d/e/1FAIpQLScO2cwZOFXMC_sDW9KpiIq6uRu0J7J09AcmWYULq9YrMt9APQ/formResponse"
+FORM_URL_AUTO = "https://docs.google.com/forms/u/0/d/e/1FAIpQLSdMzPFzLkEl9qtettxZF62YtU5J8lJs0kqv9v7r5wOPPnloyg/formResponse"
 
 FORM_FIELDS = {
-    "sent_at": "entry.1254920258",
-    "sender_name": "entry.831907760",
-    "sender_email": "entry.2137566045",
-    "content": "entry.582710391"
+    "sent_at": "entry.1426032914",
+    "sender_name": "entry.2025415057",
+    "sender_email": "entry.1002659073",
+    "content": "entry.1998393221",
+    "domain": 'entry.1839279607',
+    "company_name": 'entry.957860696',
+    "tel": 'entry.175618447',
 }
 
-def send_to_google_forms(sent_at, sender_name, sender_email, content, auto_gen=True):
-    data = {
-        FORM_FIELDS["sent_at"]: sent_at,
-        FORM_FIELDS["sender_name"]: sender_name,
-        FORM_FIELDS["sender_email"]: sender_email,
-        FORM_FIELDS["content"]: content
-    }
+
+FORM_FIELDS_AUTO = {
+    "sent_at": "entry.1939361135",
+    "sender_name": "entry.253700324",
+    "sender_email": "entry.1363315117",
+    "content": "entry.1718382702",
+    "domain": 'entry.1963539511',
+    "company_name": 'entry.1656382618',
+    "tel": 'entry.384050106',
+}
+
+
+def send_to_google_forms(sent_at, sender_name, sender_email, content, domain='', company_name='', tel='', auto_gen=True):
     if auto_gen is True:
+        data = {
+            FORM_FIELDS_AUTO["sent_at"]: sent_at,
+            FORM_FIELDS_AUTO["sender_name"]: sender_name,
+            FORM_FIELDS_AUTO["sender_email"]: sender_email,
+            FORM_FIELDS_AUTO["content"]: content,
+            FORM_FIELDS_AUTO["domain"]: domain,
+            FORM_FIELDS_AUTO["company_name"]: company_name,
+            FORM_FIELDS_AUTO["tel"]: tel,
+        }
         response = requests.post(FORM_URL_AUTO, data=data)
+
     elif auto_gen is False:
+        data = {
+            FORM_FIELDS["sent_at"]: sent_at,
+            FORM_FIELDS["sender_name"]: sender_name,
+            FORM_FIELDS["sender_email"]: sender_email,
+            FORM_FIELDS["content"]: content,
+            FORM_FIELDS["domain"]: domain,
+            FORM_FIELDS["company_name"]: company_name,
+            FORM_FIELDS["tel"]: tel,
+        }
         response = requests.post(FORM_URL_USER, data=data)
 
     if response.status_code == 200:
