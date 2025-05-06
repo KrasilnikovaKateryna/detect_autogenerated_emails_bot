@@ -394,7 +394,7 @@ def extract_website_from_email(email_body, sender_name, sender_email):
                 **Extraction Rules:**
                 1️⃣ Look for a **valid website URL** in the email body (e.g., https://example.com or www.example.com).
                 2️⃣ If multiple websites are mentioned, return the **first one** that looks like the sender's/company's site.
-                3️⃣ Accept links with or without `https://`, but prefer **full domains** over shortened or social media links.
+                3️⃣ If there is no website address in the text of the letter, but it can be taken from the sender - do it.
                 4️⃣ Ignore links to Gmail, LinkedIn, Facebook, Instagram, Twitter, and other social platforms unless clearly the main company site.
                 5️⃣ If no valid website is found, return exactly: `"No website"`
 
